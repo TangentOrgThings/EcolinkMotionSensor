@@ -65,12 +65,11 @@ metadata {
 		}
 		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat")
 		{
-			state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
+			state "default", label:'', action: "refresh.refresh", icon: "st.secondary.refresh"
 		}
 
-
 		main "motion"
-		details(["motion", "battery", "refresh", "configure"])
+		details(["motion", "battery", "driverVersion", "configure", "refresh"])
 	}
 }
 
@@ -177,9 +176,15 @@ def zwaveEvent(physicalgraph.zwave.commands.wakeupv1.WakeUpNotification cmd)
 {
 	def result = [createEvent(descriptionText: "${device.displayName} woke up", isStateChange: false)]
 
+	if (!isConfigured())
+	{
+    // we're still in the process of configuring a newly joined device
+    configure()
+	}
+
 	if (state.MSR == "011A-0601-0901" && device.currentState('motion') == null)
 	{  // Enerwave motion doesn't always get the associationSet that the hub sends on join
-	result << response(zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId))
+		result << response(zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId))
 	}
 	if (!state.lastbat || (new Date().time) - state.lastbat > 53*60*60*1000)
 	{
@@ -206,7 +211,14 @@ def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd)
 		map.value = cmd.batteryLevel
 	}
 	state.lastbat = new Date().time
-	[createEvent(map), response(zwave.wakeUpV1.wakeUpNoMoreInformation())]
+	if (!isConfigured())
+	{
+    configure()
+	}
+	else
+	{
+		[createEvent(map), response(zwave.wakeUpV1.wakeUpNoMoreInformation())]
+	}
 }
 
 def zwaveEvent(physicalgraph.zwave.Command cmd) 
@@ -238,17 +250,33 @@ def zwaveEvent(physicalgraph.zwave.commands.associationv1.AssociationReport cmd)
 		def lengthMinus2 = string_of_assoc.length() - 2
 		def final_string = string_of_assoc.getAt(0..lengthMinus2)
 		result << createEvent(name: "associations", value: "$final_string", descriptionText: "$device.displayName is associated in group ${cmd.groupingIdentifier} : $final_string")
+
+		if (cmd.groupingIdentifier == 1)
+		{
+			device.updateDataValue("Group1", "true")
+		}
+		else if (cmd.groupingIdentifier == 2)
+		{
+			device.updateDataValue("Group2", "true")
+		}
+
+	}
+	else if (cmd.groupingIdentifier == 1)
+	{
+		unsetConfigured("Group1")
+		result << response(zwave.associationV1.associationSet(groupingIdentifier:cmd.groupingIdentifier, nodeId:zwaveHubNodeId))
+		result << response(zwave.associationV1.associationGet(groupingIdentifier:cmd.groupingIdentifier))
 	}
 	else if (cmd.groupingIdentifier == 2)
 	{
+		unsetConfigured("Group2")
 		result << response(zwave.associationV1.associationSet(groupingIdentifier:cmd.groupingIdentifier, nodeId:zwaveHubNodeId))
-		result << response(zwave.associationV1.associationGet(groupingIdentifier:2))
+		result << response(zwave.associationV1.associationGet(groupingIdentifier:cmd.groupingIdentifier))
 	}
 	else
 	{
-		result << createEvent(descriptionText: "$device.displayName lacks a group 1, this is an error")
+		result << createEvent(descriptionText: "$device.displayName lacks group $cmd.groupingIdentifier")
 	}
-	result
 }
 
 def refresh()
@@ -258,6 +286,7 @@ def refresh()
 	def commands = [
 	zwave.switchBinaryV1.switchBinaryGet().format(),
 	zwave.batteryV1.batteryGet().format(),
+	zwave.associationV1.associationGet(groupingIdentifier:1).format(),
 	zwave.associationV1.associationGet(groupingIdentifier:2).format()
 	]
 	if (getDataValue("MSR") == null)
@@ -271,8 +300,41 @@ def refresh()
 	delayBetween(commands, 6000)
 }
 
-// handle commands
 def configure()
 {
+	updateDataValue("getDriverVersion", getDriverVersion())
+	updateDataValue("configured", "false")
+	delayBetween([
+		zwave.associationV2.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format(),
+		zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format(),
+	], 600)
+	
 	refresh()
+}
+
+def setConfigured()
+{
+  Boolean Group1 = device.getDataValue(["Group1"]) as Boolean
+  Boolean Group2 = device.getDataValue(["Group2"]) as Boolean
+	if ( Group1 && Group2 )
+  {
+		device.updateDataValue("configured", "true")
+	}
+	else
+  {
+		device.updateDataValue("configured", "false")
+	}
+}
+
+def unsetConfigured(String unset_param)
+{
+	device.updateDataValue(unset_param, "false")
+	device.updateDataValue("configured", "false")
+}
+
+def isConfigured()
+{
+  Boolean configured = device.getDataValue(["configured"]) as Boolean
+	
+	return configured;
 }
