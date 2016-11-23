@@ -242,7 +242,7 @@ def zwaveEvent(physicalgraph.zwave.commands.associationv1.AssociationReport cmd)
 	else if (cmd.groupingIdentifier == 2)
 	{
 		result << response(zwave.associationV1.associationSet(groupingIdentifier:cmd.groupingIdentifier, nodeId:zwaveHubNodeId))
-			result << response(zwave.associationV1.associationGet(groupingIdentifier:2))
+		result << response(zwave.associationV1.associationGet(groupingIdentifier:2))
 	}
 	else
 	{
@@ -258,7 +258,7 @@ def refresh()
 	def commands = [
 	zwave.switchBinaryV1.switchBinaryGet().format(),
 	zwave.batteryV1.batteryGet().format(),
-	zwave.associationV1.associationGet(groupingIdentifier:1).format()
+	zwave.associationV1.associationGet(groupingIdentifier:2).format()
 	]
 	if (getDataValue("MSR") == null)
 	{
