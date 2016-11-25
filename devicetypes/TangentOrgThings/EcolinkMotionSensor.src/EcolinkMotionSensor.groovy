@@ -17,7 +17,7 @@
 
 def getDriverVersion()
 {
-	return "v1.1"
+	return "v1.2"
 }
 
 metadata {
@@ -251,21 +251,10 @@ def zwaveEvent(physicalgraph.zwave.commands.associationv1.AssociationReport cmd)
 		def final_string = string_of_assoc.getAt(0..lengthMinus2)
 		result << createEvent(name: "associations", value: "$final_string", descriptionText: "$device.displayName is associated in group ${cmd.groupingIdentifier} : $final_string")
 
-		if (cmd.groupingIdentifier == 1)
-		{
-			device.updateDataValue("Group1", "true")
-		}
-		else if (cmd.groupingIdentifier == 2)
+		if (cmd.groupingIdentifier == 2)
 		{
 			device.updateDataValue("Group2", "true")
 		}
-
-	}
-	else if (cmd.groupingIdentifier == 1)
-	{
-		unsetConfigured("Group1")
-		result << response(zwave.associationV1.associationSet(groupingIdentifier:cmd.groupingIdentifier, nodeId:zwaveHubNodeId))
-		result << response(zwave.associationV1.associationGet(groupingIdentifier:cmd.groupingIdentifier))
 	}
 	else if (cmd.groupingIdentifier == 2)
 	{
@@ -286,7 +275,6 @@ def refresh()
 	def commands = [
 	zwave.switchBinaryV1.switchBinaryGet().format(),
 	zwave.batteryV1.batteryGet().format(),
-	zwave.associationV1.associationGet(groupingIdentifier:1).format(),
 	zwave.associationV1.associationGet(groupingIdentifier:2).format()
 	]
 	if (getDataValue("MSR") == null)
@@ -305,8 +293,7 @@ def configure()
 	updateDataValue("getDriverVersion", getDriverVersion())
 	updateDataValue("configured", "false")
 	delayBetween([
-		zwave.associationV2.associationSet(groupingIdentifier:1, nodeId:[zwaveHubNodeId]).format(),
-		zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format(),
+		zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()
 	], 600)
 	
 	refresh()
@@ -314,9 +301,8 @@ def configure()
 
 def setConfigured()
 {
-  Boolean Group1 = device.getDataValue(["Group1"]) as Boolean
   Boolean Group2 = device.getDataValue(["Group2"]) as Boolean
-	if ( Group1 && Group2 )
+	if ( Group2 )
   {
 		device.updateDataValue("configured", "true")
 	}
