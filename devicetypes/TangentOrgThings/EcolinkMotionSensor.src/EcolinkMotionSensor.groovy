@@ -85,28 +85,23 @@ metadata {
   }
 }
 
-def parse(String description)
-{
+def parse(String description) {
   def result = null
 
-  if (description.startsWith("Err"))
-  {
+  if (description.startsWith("Err")) {
     results << createEvent(descriptionText:description, displayed:true)
     return results
   } 
     
   def cmd = zwave.parse(description, [0x20: 1, 0x30: 1, 0x70: 1, 0x71: 2, 0x72: 1, 0x80: 1, 0x84: 2, 0x85: 2, 0x86: 1])
 	
-  if (cmd)
-  {
+  if (cmd) {
     result = zwaveEvent(cmd)
-    if (!result)
-    {
+
+    if (!result) {
       log.warning "Parse Failed and returned ${result} for command ${cmd}"
       result = createEvent(value: description, descriptionText: description)
-    }
-    else
-    {
+    } else {
       log.debug "Successfull ${result} for command ${cmd}"
     }
   } 
@@ -157,8 +152,7 @@ def zwaveEvent(physicalgraph.zwave.commands.alarmv2.AlarmReport cmd, results) {
   return result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd)
-{
+def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd) {
   def result = [createEvent(descriptionText: "${device.displayName} woke up", isStateChange: false)]
   
   if (state.tamper == "clear") {
@@ -273,6 +267,7 @@ def zwaveEvent(physicalgraph.zwave.commands.associationv2.AssociationReport cmd)
   if (misconfigured) {
     unsetConfigured()
     def commands = [
+      zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[1]).format(),
       zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[1]).format(),
       zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format(),
       zwave.associationV1.associationGet(groupingIdentifier:2).format()
@@ -305,14 +300,14 @@ def refresh()
   response(delayBetween(commands, 1000))
 }
 
-def configure()
-{
+def configure() {
   def result = []
   updateDataValue("getDriverVersion", getDriverVersion())
   unsetConfigured()
   
   result << response(delayBetween([
     zwave.configurationV1.configurationSet(parameterNumber: 0x63, configurationValue: [0xFF], size: 1).format(),
+		zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:[1]).format(),
     zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[1]).format(),
     zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()
   ], 1000))
@@ -320,18 +315,15 @@ def configure()
   result << refresh()
 }
 
-def setConfigured()
-{
+def setConfigured() {
   device.updateDataValue("configured", "true")
 }
 
-def unsetConfigured()
-{
+def unsetConfigured() {
   device.updateDataValue("configured", "false")
 }
 
-def isConfigured()
-{
+def isConfigured() {
   Boolean configured = device.getDataValue(["configured"]) as Boolean
   return configured;
 }
