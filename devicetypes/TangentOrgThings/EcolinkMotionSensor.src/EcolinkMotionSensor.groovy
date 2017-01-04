@@ -17,310 +17,321 @@
 
 def getDriverVersion()
 {
-	return "v1.2"
+  return "v2.1"
 }
 
 metadata {
-	definition (name: "Ecolink Motion Sensor", namespace: "TangentOrgThings", author: "Brian Aker") {
-		capability "Battery"
-		capability "Configuration"
-		capability "Motion Sensor"
-		capability "Refresh"
-		capability "Sensor"
-		capability "Tamper Alert"
+  definition (name: "Ecolink PIR", namespace: "TangentOrgThings", author: "Brian Aker")
+  {
+    capability "Battery"
+    capability "Configuration"
+    capability "Motion Sensor"
+    capability "Refresh"
+    capability "Sensor"
+    capability "Tamper Alert"
 
-		// String attribute with name "firmwareVersion"
-		attribute "firmwareVersion", "string"
-		attribute "driverVersion", "string"
-		attribute "associations", "string"
+    // String attribute with name "firmwareVersion"
+    attribute "firmwareVersion", "string"
+    attribute "driverVersion", "string"
+    attribute "associations", "string"
+    attribute "BasicReport", "enum", ["Unconfigured","On","Off"]
 
-		// zw:S type:2001 mfr:014A prod:0001 model:0001 ver:2.00 zwv:3.40 lib:06 cc:30,71,72,86,85,84,80,70 ccOut:20
-		fingerprint type: "2001", mfr: "014A", prod: "0001", model: "0001", deviceJoinName: "Ecolink Motion Sensor", inClusters: "0x30, 0x71, 0x72, 0x86, 0x85, 0x84, 0x80, 0x70", outClusters: "0x20" // Ecolink motion
-		fingerprint mfr: "014A", prod: "0004", model: "0001", deviceJoinName: "Ecolink Motion Sensor"  // Ecolink motion +
+    // zw:S type:2001 mfr:014A prod:0001 model:0001 ver:2.00 zwv:3.40 lib:06 cc:30,71,72,86,85,84,80,70 ccOut:20
+    fingerprint mfr: "014A", prod: "0001", model: "0001", deviceJoinName: "Ecolink Motion Sensor", inClusters: "0x30, 0x71, 0x72, 0x86, 0x85, 0x84, 0x80, 0x70", outClusters: "0x20" // Ecolink motion
+    fingerprint mfr: "014A", prod: "0004", model: "0001", deviceJoinName: "Ecolink Motion Sensor"  // Ecolink motion +
+  }
 
+  simulator
+  {
+    status "inactive": "command: 3003, payload: 00"
+    status "active": "command: 3003, payload: FF"
+  }
+
+  tiles
+  {
+    standardTile("motion", "device.motion", width: 2, height: 2)
+    {
+      state("active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0")
+      state("inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff")
+    }
+    
+    valueTile("battery", "device.battery", inactiveLabel: false, decoration: "flat")
+    {
+      state("battery", label:'${currentValue}% battery', unit:"")
+    }
+    
+    valueTile("driverVersion", "device.driverVersion", inactiveLabel: true, decoration: "flat") 
+    {
+      state("driverVersion", label:'${currentValue}')
 	}
-
-	simulator {
-		status "inactive": "command: 3003, payload: 00"
-		status "active": "command: 3003, payload: FF"
+    
+    valueTile("tamper", "device.tamper", inactiveLabel: true, decoration: "flat") 
+    {
+      state("tamper", label:'${currentValue}')
 	}
+    
+    standardTile("configure", "device.switch", inactiveLabel: false, decoration: "flat")
+    {
+      state "default", label:"", action:"configuration.configure", icon:"st.secondary.configure"
+    }
+    
+    standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat")
+    {
+      state "default", label:'', action: "refresh.refresh", icon: "st.secondary.refresh"
+    }
 
-	tiles {
-		standardTile("motion", "device.motion", width: 2, height: 2)
-		{
-			state("active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0")
-			state("inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff")
-		}
-		valueTile("battery", "device.battery", inactiveLabel: false, decoration: "flat")
-		{
-			state("battery", label:'${currentValue}% battery', unit:"")
-		}
-		valueTile("driverVersion", "device.driverVersion", inactiveLabel: false, decoration: "flat") 
-		{
-			state("driverVersion", label:'${currentValue}')
-		}
-		standardTile("configure", "device.switch", inactiveLabel: false, decoration: "flat")
-		{
-			state "default", label:"", action:"configure", icon:"st.secondary.configure"
-		}
-		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat")
-		{
-			state "default", label:'', action: "refresh.refresh", icon: "st.secondary.refresh"
-		}
-
-		main "motion"
-		details(["motion", "battery", "driverVersion", "configure", "refresh"])
-	}
+    main "motion"
+    details(["motion", "battery", "tamper", "driverVersion", "configure", "refresh"])
+  }
 }
 
-def parse(String description) 
+def parse(String description)
 {
-	def result = null
-	if (description.startsWith("Err")) 
-	{
-		result = createEvent(descriptionText:description)
-	} 
-	else 
-	{
-		def cmd = zwave.parse(description, [0x20: 1, 0x30: 1, 0x70: 2, 0x71: 3, 0x72: 2, 0x80: 1, 0x84: 1, 0x85: 2, 0x86: 1])
-		if (cmd)
-		{
-			result = zwaveEvent(cmd)
-		}
-		else
-		{
-			result = createEvent(value: description, descriptionText: description, isStateChange: false)
-		}
-	}
-	return result
+  def result = null
+
+  if (description.startsWith("Err"))
+  {
+    results << createEvent(descriptionText:description, displayed:true)
+    return results
+  } 
+    
+  def cmd = zwave.parse(description, [0x20: 1, 0x30: 1, 0x70: 1, 0x71: 2, 0x72: 1, 0x80: 1, 0x84: 2, 0x85: 2, 0x86: 1])
+	
+  if (cmd)
+  {
+    result = zwaveEvent(cmd)
+    if (!result)
+    {
+      log.warning "Parse Failed and returned ${result} for command ${cmd}"
+      result = createEvent(value: description, descriptionText: description)
+    }
+    else
+    {
+      log.debug "Successfull ${result} for command ${cmd}"
+    }
+  } 
+  else 
+  {
+    log.info "Non-parsed event: ${description}"
+    result = createEvent(value: description, descriptionText: description)
+  }
+    
+  return result
 }
 
-def sensorValueEvent(value)
-{
-	if (value)
-	{
-		createEvent(name: "motion", value: "active", descriptionText: "$device.displayName detected motion")
-	}
-	else
-	{
-		createEvent(name: "motion", value: "inactive", descriptionText: "$device.displayName motion has stopped")
-	}
+def sensorValueEvent(short value) {
+  def result = []
+  
+  if (value) {
+    result << createEvent(name: "motion", value: "active", descriptionText: "$device.displayName detected motion", isStateChange: true, displayed: true)
+  } else {
+    result << createEvent(name: "motion", value: "inactive", descriptionText: "$device.displayName motion has stopped", isStateChange: true, displayed: true)
+  }
+   
+  result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd)
-{
-	sensorValueEvent(cmd.value)
+def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicReport cmd) {
+  log.info "$device.displayName  BasicReport : ${cmd.value}"
+  sensorValueEvent(cmd.value)
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd)
-{
-	sensorValueEvent(cmd.value)
+def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
+  log.info "$device.displayName BasicSet : ${cmd.value}"
+  sensorValueEvent(cmd.value)
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd)
-{
-	sensorValueEvent(cmd.value)
+def zwaveEvent(physicalgraph.zwave.commands.sensorbinaryv1.SensorBinaryReport cmd) {
+  log.info "$device.displayName SensorBinaryReport : ${cmd.sensorValue}"
+  sensorValueEvent(cmd.sensorValue)
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.sensorbinaryv1.SensorBinaryReport cmd)
-{
-	sensorValueEvent(cmd.sensorValue)
+def zwaveEvent(physicalgraph.zwave.commands.alarmv2.AlarmReport cmd, results) {
+  def result = []
+  if (cmd.alarmLevel == 0x11) {
+    result << createEvent(name: "tamper", value: "detected", descriptionText: "$device.displayName covering was removed", isStateChange: true, displayed: true)
+  } else {
+    result << createEvent(name: "tamper", value: "clear", descriptionText: "$device.displayName is clear", isStateChange: true, displayed: true)
+  }
+  
+  return result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.sensoralarmv1.SensorAlarmReport cmd)
+def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd)
 {
-	sensorValueEvent(cmd.sensorState)
+  def result = [createEvent(descriptionText: "${device.displayName} woke up", isStateChange: false)]
+  
+  if (state.tamper == "clear") {
+  	result << createEvent(name: "tamper", value: "clear", descriptionText: "$device.displayName is clear", isStateChange: true, displayed: true)
+  }
+
+  // If the device is in the process of configuring a newly joined network, do not send wakeUpnoMoreInformation commands
+  if (isConfigured()) {
+    if (!state.lastbat || (new Date().time) - state.lastbat > 53*60*60*1000) {
+      result << response(zwave.batteryV1.batteryGet())
+    } else {
+      result << response(zwave.wakeUpV1.wakeUpNoMoreInformation())
+    }
+  }
+  
+  return result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.notificationv3.NotificationReport cmd)
-{
-	def result = []
-	if (cmd.notificationType == 0x07)
-	{
-		if (cmd.v1AlarmType == 0x07)
-		{  // special case for nonstandard messages from Monoprice ensors
-		result << sensorValueEvent(cmd.v1AlarmLevel)
-		}
-		else if (cmd.event == 0x01 || cmd.event == 0x02 || cmd.event == 0x07 || cmd.event == 0x08)
-		{
-			result << sensorValueEvent(1)
-		}
-		else if (cmd.event == 0x00)
-		{
-			result << sensorValueEvent(0)
-		}
-		else if (cmd.event == 0x03)
-		{
-			result << createEvent(name: "tamper", value: "detected", descriptionText: "$device.displayName covering was removed", isStateChange: true)
-			result << response(zwave.batteryV1.batteryGet())
-		}
-		else if (cmd.event == 0x05 || cmd.event == 0x06)
-		{
-			result << createEvent(descriptionText: "$device.displayName detected glass breakage", isStateChange: true)
-		}
-	}
-	else if (cmd.notificationType)
-	{
-		def text = "Notification $cmd.notificationType: event ${([cmd.event] + cmd.eventParameter).join(", ")}"
-			result << createEvent(name: "notification$cmd.notificationType", value: "$cmd.event", descriptionText: text, isStateChange: true, displayed: false)
-	}
-	else
-	{
-		def value = cmd.v1AlarmLevel == 255 ? "active" : cmd.v1AlarmLevel ?: "inactive"
-		result << createEvent(name: "alarm $cmd.v1AlarmType", value: value, isStateChange: true, displayed: false)
-	}
-	result
+def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
+  def map = [ name: "battery", unit: "%" ]
+  
+  if (cmd.batteryLevel == 0xFF) {
+    map.value = 1
+    map.descriptionText = "${device.displayName} has a low battery"
+    map.isStateChange = true
+    map.displayed = true
+  } else {
+  	map.value = batteryLevelcmd.batteryLevel
+  
+    if (state.previous_batteryLevel != batteryLevelcmd.batteryLevel) {
+      state.previous_batteryLevel = batteryLevelcmd.batteryLevel
+      map.isStateChange = true
+      map.displayed = true
+    }
+    map.descriptionText = "${device.displayName} is at ${batteryLevelcmd.batteryLevel}%"
+  }
+  
+  state.lastbat = new Date().time
+  
+  def result = [createEvent(map)]
+  
+  if (state.BasicReport != "On") {
+  	result = [result, response(zwave.configurationV1.configurationSet(parameterNumber: 0x63, configurationValue: 0xFF, size: 1))]
+  }
+  
+  return result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.wakeupv1.WakeUpNotification cmd)
-{
-	def result = [createEvent(descriptionText: "${device.displayName} woke up", isStateChange: false)]
-
-	if (!isConfigured())
-	{
-    // we're still in the process of configuring a newly joined device
-    configure()
-	}
-
-	if (state.MSR == "011A-0601-0901" && device.currentState('motion') == null)
-	{  // Enerwave motion doesn't always get the associationSet that the hub sends on join
-		result << response(zwave.associationV1.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId))
-	}
-	if (!state.lastbat || (new Date().time) - state.lastbat > 53*60*60*1000)
-	{
-		result << response(zwave.batteryV1.batteryGet())
-	}
-	else
-	{
-		result << response(zwave.wakeUpV1.wakeUpNoMoreInformation())
-	}
-	result
+def zwaveEvent(physicalgraph.zwave.Command cmd) {
+  createEvent(descriptionText: "$device.displayName command not implemented: $cmd", displayed: true)
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd)
-{
-	def map = [ name: "battery", unit: "%" ]
-	if (cmd.batteryLevel == 0xFF)
-	{
-		map.value = 1
-		map.descriptionText = "${device.displayName} has a low battery"
-		map.isStateChange = true
-	}
-	else 
-	{
-		map.value = cmd.batteryLevel
-	}
-	state.lastbat = new Date().time
-	if (!isConfigured())
-	{
-    configure()
-	}
-	else
-	{
-		[createEvent(map), response(zwave.wakeUpV1.wakeUpNoMoreInformation())]
-	}
+def zwaveEvent(physicalgraph.zwave.commands.manufacturerspecificv1.ManufacturerSpecificReport cmd) {
+  def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
+  log.debug "msr: $msr"
+  updateDataValue("MSR", msr)
+
+  createEvent(descriptionText: "$device.displayName MSR: $msr", isStateChange: false)
 }
 
-def zwaveEvent(physicalgraph.zwave.Command cmd) 
-{
-	createEvent(descriptionText: "$device.displayName: $cmd", displayed: false)
+def zwaveEvent(physicalgraph.zwave.commands.versionv1.VersionReport cmd) {
+  def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
+  updateDataValue("fw", fw)
+  updateDataValue("ver", "${cmd.applicationVersion >> 4}.${cmd.applicationVersion & 0xF}")
+  def text = "$device.displayName: firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
+  createEvent(descriptionText: text, isStateChange: false)
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) 
-{
-	def result = []
-
-	def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-	log.debug "msr: $msr"
-	updateDataValue("MSR", msr)
-
-	result << createEvent(descriptionText: "$device.displayName MSR: $msr", isStateChange: false)
-	result
+def zwaveEvent(physicalgraph.zwave.commands.configurationv1.ConfigurationReport cmd) {
+  def result = []
+  log.debug "ConfigurationReport: $cmd"
+  
+  if (!isConfigured()){
+  	result << createEvent(name: "BasicReport", value: "Unconfigured", displayed: false)
+    result = [result, response(zwave.configurationV1.configurationSet(parameterNumber: 0x63, configurationValue: [0xFF], size: 1))]
+  } else if (cmd.parameterNumber == 0x63 && cmd.configurationValue[0] == 0) {
+    result << createEvent(name: "BasicReport", value: "Off", displayed: false)
+  } else {
+    result << createEvent(name: "BasicReport", value: "On", displayed: false)
+  }
+  
+  return result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.associationv1.AssociationReport cmd) 
-{
-	def result = []
-	if (cmd.nodeId.any { it == zwaveHubNodeId }) 
-	{
-		def string_of_assoc
-		cmd.nodeId.each {
-			string_of_assoc << "${it}, "
-		}
-		def lengthMinus2 = string_of_assoc.length() - 2
-		def final_string = string_of_assoc.getAt(0..lengthMinus2)
-		result << createEvent(name: "associations", value: "$final_string", descriptionText: "$device.displayName is associated in group ${cmd.groupingIdentifier} : $final_string")
-
-		if (cmd.groupingIdentifier == 2)
-		{
-			device.updateDataValue("Group2", "true")
-		}
-	}
-	else if (cmd.groupingIdentifier == 2)
-	{
-		unsetConfigured("Group2")
-		result << response(zwave.associationV1.associationSet(groupingIdentifier:cmd.groupingIdentifier, nodeId:zwaveHubNodeId))
-		result << response(zwave.associationV1.associationGet(groupingIdentifier:cmd.groupingIdentifier))
-	}
-	else
-	{
-		result << createEvent(descriptionText: "$device.displayName lacks group $cmd.groupingIdentifier")
-	}
+def zwaveEvent(physicalgraph.zwave.commands.associationv2.AssociationReport cmd) {
+  def result = []
+  Boolean misconfigured = true
+  
+  if (cmd.groupingIdentifier == 1) {
+    if (cmd.nodeId.any { it == zwaveHubNodeId }) {
+      misconfigured = false
+      setConfigured()
+    }
+  } else if (cmd.groupingIdentifier == 2) {
+    if (cmd.nodeId.any { it == zwaveHubNodeId }) 
+    {
+      def string_of_assoc
+      cmd.nodeId.each {
+        string_of_assoc << "${it}, "
+      }
+      def lengthMinus2 = string_of_assoc.length() - 2
+      def final_string = string_of_assoc.getAt(0..lengthMinus2)
+      result << createEvent(name: "associations", value: "$final_string", descriptionText: "$device.displayName is associated in group ${cmd.groupingIdentifier} : $final_string")
+      
+      misconfigured = false
+      setConfigured()
+    }
+  } else {
+    result << createEvent(descriptionText: "$device.displayName lacks group $cmd.groupingIdentifier")
+  }
+  
+  if (misconfigured) {
+    unsetConfigured()
+    def commands = [
+      zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[1]).format(),
+      zwave.associationV1.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format(),
+      zwave.associationV1.associationGet(groupingIdentifier:2).format()
+    ]
+    result << delayBetween(commands, 1000)
+  }
+    
+  return result
 }
 
 def refresh()
 {
-	log.debug "refresh() is called"
+  log.debug "refresh() is called"
 
-	def commands = [
-	zwave.switchBinaryV1.switchBinaryGet().format(),
-	zwave.batteryV1.batteryGet().format(),
-	zwave.associationV1.associationGet(groupingIdentifier:2).format()
-	]
-	if (getDataValue("MSR") == null)
-	{
-		commands << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
-	}
-	if (device.currentState('firmwareVersion') == null)
-	{
-		commands << zwave.versionV1.versionGet().format()
-	}
-	delayBetween(commands, 6000)
+   def commands = [
+    zwave.batteryV1.batteryGet().format(),
+    zwave.alarmV2.AlarmGet().format(),
+    zwave.associationV2.associationGet(groupingIdentifier:1).format(),
+    zwave.associationV2.associationGet(groupingIdentifier:2).format()
+  ]
+  
+  if (getDataValue("MSR") == null)
+  {
+    commands << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
+  }
+  if (getDataValue('fw') == null)
+  {
+    commands << zwave.versionV1.versionGet().format()
+  }
+  response(delayBetween(commands, 1000))
 }
 
 def configure()
 {
-	updateDataValue("getDriverVersion", getDriverVersion())
-	updateDataValue("configured", "false")
-	delayBetween([
-		zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()
-	], 600)
-	
-	refresh()
+  def result = []
+  updateDataValue("getDriverVersion", getDriverVersion())
+  unsetConfigured()
+  
+  result << response(delayBetween([
+    zwave.configurationV1.configurationSet(parameterNumber: 0x63, configurationValue: [0xFF], size: 1).format(),
+    zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[1]).format(),
+    zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:[zwaveHubNodeId]).format()
+  ], 1000))
+  
+  result << refresh()
 }
 
 def setConfigured()
 {
-  Boolean Group2 = device.getDataValue(["Group2"]) as Boolean
-	if ( Group2 )
-  {
-		device.updateDataValue("configured", "true")
-	}
-	else
-  {
-		device.updateDataValue("configured", "false")
-	}
+  device.updateDataValue("configured", "true")
 }
 
-def unsetConfigured(String unset_param)
+def unsetConfigured()
 {
-	device.updateDataValue(unset_param, "false")
-	device.updateDataValue("configured", "false")
+  device.updateDataValue("configured", "false")
 }
 
 def isConfigured()
 {
   Boolean configured = device.getDataValue(["configured"]) as Boolean
-	
-	return configured;
+  return configured;
 }
