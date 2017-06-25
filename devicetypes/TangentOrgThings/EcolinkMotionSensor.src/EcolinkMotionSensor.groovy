@@ -314,14 +314,14 @@ def configure()
 
 def setConfigured()
 {
-  Boolean Group1 = device.getDataValue(["Group1"]) as Boolean
-  Boolean Group2 = device.getDataValue(["Group2"]) as Boolean
+	Boolean Group1 = device.getDataValue(["Group1"]) as Boolean
+	Boolean Group2 = device.getDataValue(["Group2"]) as Boolean
 	if ( Group1 && Group2 )
-  {
+	{
 		device.updateDataValue("configured", "true")
 	}
 	else
-  {
+	{
 		device.updateDataValue("configured", "false")
 	}
 }
